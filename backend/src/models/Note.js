@@ -13,6 +13,6 @@ const noteSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-const Note = mongoose.model("Note", noteSchema);
+const Note = mongoose.model("Note",noteSchema);
 
 export default Note;
