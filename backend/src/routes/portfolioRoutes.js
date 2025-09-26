@@ -1,6 +1,7 @@
 import express from "express";
 import Portfolio from "../models/Portfolio.js";
 import { protect } from "../middleware/auth.js";
+import { getLatestPrice } from "../services/marketService.js";
 import Position from "../models/Position.js";
 
 const router = express.Router();
@@ -18,11 +19,44 @@ router.post("/", protect, async (req, res) => {
 });
 
 // Get all portfolios of user
+// router.get("/", protect, async (req, res) => {
+//     try {
+//         const portfolios = await Portfolio.find({ user: req.user._id }).sort({ createdAt: -1 });
+//         res.json(portfolios);
+//     } catch (err) {
+//         res.status(500).json({ message: "Internal server error" });
+//     }
+// });
+
 router.get("/", protect, async (req, res) => {
     try {
-        const portfolios = await Portfolio.find({ user: req.user._id }).sort({ createdAt: -1 });
-        res.json(portfolios);
+        const portfolios = await Portfolio.find({ user: req.user._id });
+
+        const enriched = await Promise.all(
+            portfolios.map(async (p) => {
+                // get positions for this portfolio
+                const positions = await Position.find({ portfolio: p._id });
+
+                let totalValue = 0;
+                for (let pos of positions) {
+                    const latestPrice = await getLatestPrice(pos.symbol);
+                    if (latestPrice) {
+                        totalValue += pos.quantity * latestPrice;
+                    }
+                }
+
+                return {
+                    _id: p._id,
+                    name: p.name,
+                    baseCurrency: p.baseCurrency,
+                    totalValue,
+                };
+            })
+        );
+
+        res.json(enriched);
     } catch (err) {
+        console.error("Error fetching enriched portfolios:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 });
@@ -81,6 +115,50 @@ router.get("/:id/summary", protect, async (req, res) => {
         res.json({ portfolio: portfolio.name, baseCurrency: portfolio.baseCurrency, ...summary });
     } catch (err) {
         console.error("Error fetching portfolio summary:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// Get portfolio valuation
+router.get("/:id/value", protect, async (req, res) => {
+    try {
+        const portfolio = await Portfolio.findOne({ _id: req.params.id, user: req.user._id });
+        if (!portfolio) return res.status(404).json({ message: "Portfolio not found" });
+
+        // Fetch positions under this portfolio
+        const positions = await Position.find({ portfolio: portfolio._id });
+
+        let totalValue = 0;
+        const enrichedPositions = [];
+
+        for (let pos of positions) {
+            const latestPrice = await getLatestPrice(pos.symbol);
+            if (!latestPrice) continue; // skip if no market data yet
+
+            const marketValue = pos.quantity * latestPrice;
+            const costBasis = pos.quantity * pos.avgPrice;
+            const unrealizedPnL = marketValue - costBasis;
+
+            totalValue += marketValue;
+
+            enrichedPositions.push({
+                symbol: pos.symbol,
+                quantity: pos.quantity,
+                avgPrice: pos.avgPrice,
+                latestPrice,
+                marketValue,
+                unrealizedPnL
+            });
+        }
+
+        res.json({
+            portfolioId: portfolio._id,
+            baseCurrency: portfolio.baseCurrency,
+            totalValue,
+            positions: enrichedPositions
+        });
+    } catch (err) {
+        console.error("Error calculating portfolio value:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 });
