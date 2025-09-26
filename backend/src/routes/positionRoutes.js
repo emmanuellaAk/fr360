@@ -42,25 +42,6 @@ router.get("/", protect, async (req, res) => {
 });
 
 // Update a position
-// router.put("/:positionId", protect, async (req, res) => {
-//     try {
-//         const portfolio = await Portfolio.findOne({ _id: req.params.portfolioId, user: req.user._id });
-//         if (!portfolio) return res.status(404).json({ message: "Portfolio not found" });
-
-//         const updated = await Position.findOneAndUpdate(
-//             { _id: req.params.positionId, portfolio: portfolio._id },
-//             req.body,
-//             { new: true }
-//         );
-//         if (!updated) return res.status(404).json({ message: "Position not found" });
-
-//         res.json(updated);
-//     } catch (err) {
-//         console.error("Error updating position:", err);
-//         res.status(500).json({ message: "Internal server error" });
-//     }
-// });
-// Update a position
 router.put("/:positionId", protect, async (req, res) => {
     try {
         const { quantity, avgPrice } = req.body;
