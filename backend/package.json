@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": " node src/server.js",
-    "worker": "node src/workers/priceWorker.js"
+    "worker": "node src/workers/priceWorker.js",
+    "varWorker": "node src/workers/varWorker.js"
   },
   "type": "module",
   "keywords": [],

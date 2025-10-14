@@ -18,13 +18,16 @@ const VaRRunSchema = new mongoose.Schema({
     },
     params: {
         confidence: { type: Number, required: true },
-        horizonDays: { type: Number, required: true }
+        horizonDays: { type: Number, required: true },
+        simulations: { type: Number }
     },
     result: {
         portfolioValue: Number,
         varValue: Number,
-        quantileReturn : Number,
+        quantileReturn: Number,
     },
+    status: { type: String, enum: ["queued", "running", "completed", "failed", "pending"], default: "pending" },
+    completedAt: Date,
     createdAt: { type: Date, default: Date.now }
 });
 

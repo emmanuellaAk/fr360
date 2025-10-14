@@ -1,35 +1,73 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
 import VaRRun from "../models/VaRRun.js";
 import Portfolio from "../models/Portfolio.js";
 import Position from "../models/Position.js";
-import { computeMonteCarloVaR } from "../services/varService.js"; // we’ll define this
+import { computeMonteCarloVaR } from "../services/montecarloService.js";
 
-const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379");
 
-export const varWorker = new Worker(
-    "montecarlo-var",
-    async job => {
-        const { runId } = job.data;
+dotenv.config();
 
-        const run = await VaRRun.findById(runId);
-        if (!run) throw new Error("VaRRun not found");
+// connect mongo (worker runs as separate process)
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected in varWorker..."))
+  .catch(err => console.error("Mongo error:", err));
 
-        await VaRRun.findByIdAndUpdate(runId, { status: "running" });
+const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
+  maxRetriesPerRequest: null,
+});
+const worker = new Worker(
+  "montecarlo-var",
+  async job => {
+    const { runId } = job.data;
+    console.log(`Processing job ${job.id} for VaRRun ${runId}`);
 
-        const portfolio = await Portfolio.findById(run.portfolio);
-        const positions = await Position.find({ portfolio: portfolio._id });
+    // mark running
+    await VaRRun.findByIdAndUpdate(runId, { status: "running" });
 
-        const simulationResult = await computeMonteCarloVaR(positions, run.params.confidence, run.params.horizonDays, run.params.simulations);
+    const run = await VaRRun.findById(runId);
+    if (!run) throw new Error("VaRRun not found");
 
-        run.result = simulationResult;
-        run.status = "completed";
-        await run.save();
+    const portfolio = await Portfolio.findById(run.portfolio);
+    if (!portfolio) throw new Error("Portfolio not found");
 
-        return run;
-    },
-    { connection }
+    const positions = await Position.find({ portfolio: portfolio._id });
+
+    // set simulation count from params or default
+    const sims = run.params.simulations || 5000;
+
+    // compute
+    const result = await computeMonteCarloVaR(
+      positions.map(p => ({ symbol: p.symbol, quantity: p.quantity, avgPrice: p.avgPrice })),
+      run.params.confidence,
+      run.params.horizonDays,
+      sims
+    );
+
+    run.result = result;
+    run.status = "completed";
+    run.completedAt = new Date();
+    await run.save();
+
+    return run;
+  },
+  { connection }
 );
 
-varWorker.on("completed", job => console.log(`Job ${job.id} completed.`));
-varWorker.on("failed", (job, err) => console.error(`Job ${job.id} failed:`, err));
+worker.on("completed", (job, returnvalue) => {
+  console.log(`Job ${job.id} completed`);
+});
+worker.on("failed", (job, err) => {
+  console.error(`Job ${job.id} failed:`, err);
+});
+
+process.on("SIGINT", async () => {
+  await worker.close();
+  await mongoose.disconnect();
+  connection.disconnect();
+  process.exit(0);
+});
+
+console.log("✅ Monte Carlo varWorker started and listening for jobs...");
