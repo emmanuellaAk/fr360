@@ -5,7 +5,7 @@ import { getLatestPrice } from "../services/marketService.js";
 import { getEnrichedPortfolio, getPortfolioPositions } from "../services/dataPrep.js";
 import Position from "../models/Position.js";
 import VaRRun from "../models/VaRRun.js";
-import { computeParametricVaR } from "../services/varService.js";
+import { computeParametricVaR } from "../services/parametricVarService.js";
 import {varQueue} from "../queues/varQueues.js"
 
 const router = express.Router();

@@ -23,6 +23,7 @@ const VaRRunSchema = new mongoose.Schema({
     result: {
         portfolioValue: Number,
         varValue: Number,
+        quantileReturn : Number,
     },
     createdAt: { type: Date, default: Date.now }
 });
