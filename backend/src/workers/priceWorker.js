@@ -1,7 +1,8 @@
 import cron from "node-cron";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import MarketPrice from "./models/MarketPrice.js";
+import { createClient } from "redis";
+import MarketPrice from "../models/MarketPrice.js";
 
 dotenv.config();
 
@@ -11,6 +12,14 @@ mongoose.connect(process.env.MONGO_URI)
 // Pick some symbols we want to simulate
 const SYMBOLS = ["AAPL", "TSLA", "BTC-USD"];
 
+const redis = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+});
+
+redis.on("error", (err) => console.error("❌ Redis Client Error", err));
+
+await redis.connect();
+console.log("✅ Redis connected in worker...");
 // Random walk function (generate next price based on last one)
 const generateNextPrice = (lastPrice) => {
   const changePercent = (Math.random() - 0.5) * 0.02; // -1% to +1%
@@ -36,7 +45,7 @@ const simulatePrices = async () => {
         price: newPrice,
       });
       await priceDoc.save();
-
+      await redis.set(`latest:${symbol}`, newPrice.toFixed(2));
       console.log(`[${new Date().toISOString()}] ${symbol}: ${newPrice.toFixed(2)}`);
     }
   } catch (err) {
@@ -48,3 +57,10 @@ const simulatePrices = async () => {
 cron.schedule("*/10 * * * * *", simulatePrices);
 
 console.log("📈 Price simulation worker started...");
+
+process.on("SIGINT", async () => {
+  await mongoose.disconnect();
+  await redis.disconnect();
+  console.log("🛑 Worker stopped gracefully");
+  process.exit(0);
+});

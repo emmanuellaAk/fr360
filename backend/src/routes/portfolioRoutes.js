@@ -6,7 +6,7 @@ import { getEnrichedPortfolio, getPortfolioPositions } from "../services/dataPre
 import Position from "../models/Position.js";
 import VaRRun from "../models/VaRRun.js";
 import { computeParametricVaR } from "../services/varService.js";
-import { varQueue } from "../queues/varQueue.js";
+import {varQueue} from "../queues/varQueues.js"
 
 const router = express.Router();
 
@@ -125,36 +125,5 @@ router.get("/:id/value", protect, async (req, res) => {
     }
 });
 
-// router.post("/:id/var", protect, async (req, res) => {
-//     try {
-//         const { method, confidence, horizonDays } = req.body;
-//         if (method !== "parametric") {
-//             return res.status(400).json({ message: "Only parametric supported right now" });
-//         }
-
-//         const portfolio = await Portfolio.findOne({ _id: req.params.id, user: req.user._id });
-//         if (!portfolio) return res.status(404).json({ message: "Portfolio not found" });
-
-//         const positions = await Position.find({ portfolio: portfolio._id });
-//         if (positions.length === 0) return res.status(400).json({ message: "No positions in portfolio" });
-
-//         const result = await computeParametricVaR(positions, confidence, horizonDays);
-
-//         // store VaRRun
-//         const run = new VaRRun({
-//             portfolio: portfolio._id,
-//             user: req.user._id,
-//             method,
-//             params: { confidence, horizonDays },
-//             result
-//         });
-//         await run.save();
-
-//         res.json(run);
-//     } catch (err) {
-//         console.error("Error running VaR:", err);
-//         res.status(500).json({ message: "Internal server error" });
-//     }
-// });
 
 export default router;
