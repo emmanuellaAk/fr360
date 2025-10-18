@@ -9,6 +9,7 @@ import SignUp from "./pages/Auth/SignUp";
 import Login from "./pages/Auth/Login";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import { AuthProvider } from "./context/AuthContext";
+import ProtectRoute from "./pages/Auth/ProtectRoute";
 
 const App = () => {
   return (
@@ -18,7 +19,10 @@ const App = () => {
           <Routes>
             <Route path="/signup" element={<SignUp />} />
             <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+
+            <Route path="/" element={<ProtectRoute />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+            </Route>
           </Routes>
         </Router>
 
@@ -29,7 +33,7 @@ const App = () => {
               fontSize: "13px"
             },
           }} />
-      </AuthProvider>
+      </AuthProvider >
     </>
   )
 }
